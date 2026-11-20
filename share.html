@@ -5,7 +5,36 @@ try {
 if(!encoded||encoded.length>30000)throw Error('유효한 공유 데이터가 없습니다.');
 // URLSearchParams already decodes the query value. Keep a legacy fallback for older links.
 let p;
-try { p=JSON.parse(encoded); } catch (_) { p=JSON.parse(decodeURIComponent(encoded)); }
+if(encoded.startsWith('v4.')){
+ const raw=encoded.slice(3);
+ if(!/^[A-Za-z0-9_-]+$/.test(raw)||raw.length>30000)throw Error('잘못된 압축 근무표입니다.');
+ const base64=raw.replace(/-/g,'+').replace(/_/g,'/');
+ const binary=atob(base64);
+ const bytes=Uint8Array.from(binary,ch=>ch.charCodeAt(0));
+ const a=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+ if(!Array.isArray(a)||a.length!==8||a[0]!==4||!['m','r'].includes(a[1])||!Array.isArray(a[6]))throw Error('지원하지 않는 압축 근무표입니다.');
+ const shiftTypes=a[6].map(s=>{
+   if(!Array.isArray(s)||s.length!==7)throw Error('잘못된 근무 종류입니다.');
+   return {id:s[0],name:s[1],background:s[2],foreground:s[3],swatch:s[4],startTime:s[5],endTime:s[6]};
+ });
+ p={format:'grid-by-day-share',version:3,mode:a[1]==='m'?'monthly':'repeat',patternId:a[2],pattern:a[3],patternStartDate:a[4],patternStartIndex:a[5],shiftTypes};
+ if(p.mode==='monthly'){
+   const days={};
+   const origin=Date.UTC(2020,0,1);
+   for(const item of a[7].split(',')){
+     if(!/^[0-9a-z]+\\.[0-9a-z]+$/.test(item))throw Error('잘못된 근무 날짜입니다.');
+     const [d,s]=item.split('.');
+     const index=parseInt(s,36), offset=parseInt(d,36);
+     if(!Number.isSafeInteger(offset)||offset<0||offset>30000||!shiftTypes[index])throw Error('잘못된 근무 날짜 또는 종류입니다.');
+     const date=new Date(origin+offset*86400000).toISOString().slice(0,10);
+     if(Object.prototype.hasOwnProperty.call(days,date))throw Error('중복된 근무 날짜입니다.');
+     days[date]=shiftTypes[index].id;
+   }
+   p.days=days;
+ }
+}else{
+ try { p=JSON.parse(encoded); } catch (_) { p=JSON.parse(decodeURIComponent(encoded)); }
+}
 if(!p||typeof p!=='object'||Array.isArray(p)||p.format!=='grid-by-day-share'||![1,2,3].includes(p.version)||!Array.isArray(p.shiftTypes)||p.shiftTypes.length<1||p.shiftTypes.length>100||!p.shiftTypes.every(x=>x&&typeof x.id==='string'&&typeof x.name==='string')||!Array.isArray(p.pattern)||p.pattern.length>366||!['repeat','monthly'].includes(p.mode)||typeof p.patternStartDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(p.patternStartDate)||!Number.isInteger(p.patternStartIndex))throw Error('지원하지 않는 근무표입니다.');
 if(p.mode==='monthly' && !p.days && !p.teams && typeof p.packedDays!=='string')throw Error('월간 근무표 데이터가 없습니다.');
 details.textContent='유형: '+(p.mode==='monthly'?'매월 편성형':'고정 반복형')+'\n근무 종류: '+p.shiftTypes.map(x=>String(x.name||'').slice(0,40)).join(', ')+'\n기준일: '+String(p.patternStartDate||'')+(p.month?'\n대상 월: '+String(p.month):'');
