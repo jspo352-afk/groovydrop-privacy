@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>근무표 공유 | Grid by Day</title><style>body{font-family:system-ui,sans-serif;background:#f6f8fb;color:#182638;margin:0}main{max-width:520px;margin:8vh auto;padding:28px;background:white;border-radius:20px;box-shadow:0 8px 28px #18263812}h1{font-size:24px}p{line-height:1.7}.btn{display:block;background:#226b9a;color:white;text-decoration:none;padding:15px;border-radius:12px;text-align:center;font-weight:bold;margin:16px 0}.muted{color:#64748b;font-size:14px}#details{white-space:pre-line}</style></head><body><main><h1>Grid by Day 근무표 공유</h1><p id="details">공유된 근무표를 확인하는 중...</p><p class="muted">근무표는 공유받은 링크에서 확인한 뒤 앱으로 가져올 수 있습니다.</p><a id="open" class="btn" hidden>Grid by Day에 근무표 적용하기</a><a class="btn" style="background:#334155" href="https://play.google.com/store/apps/details?id=com.gridbyday.app">Google Play에서 앱 보기</a><p class="muted">근무표를 가져오기 전에 앱에서 확인할 수 있습니다. 개인 급여·메모·연차 기록은 공유되지 않습니다.</p></main><script>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>근무표 공유 | Grid by Day</title><style>body{font-family:system-ui,sans-serif;background:#f6f8fb;color:#182638;margin:0}main{max-width:520px;margin:8vh auto;padding:28px;background:white;border-radius:20px;box-shadow:0 8px 28px #18263812}h1{font-size:24px}p{line-height:1.7}.btn{display:block;background:#226b9a;color:white;text-decoration:none;padding:15px;border-radius:12px;text-align:center;font-weight:bold;margin:16px 0}.muted{color:#64748b;font-size:14px}#details{white-space:pre-line}</style></head><body><main><h1>Grid by Day 근무표 공유</h1><p id="details">공유된 근무표를 확인하는 중...</p><p class="muted">아래 버튼을 누르면 근무표 데이터를 복사하고 Grid by Day에서 적용 화면을 엽니다.</p><button id="open" class="btn" style="width:100%;border:0;font:inherit;cursor:pointer" hidden>Grid by Day에 근무표 적용하기</button><p id="transfer-status" class="muted" role="status"></p><a class="btn" style="background:#334155" href="https://play.google.com/store/apps/details?id=com.gridbyday.app">Google Play에서 앱 보기</a><p class="muted">근무표를 가져오기 전에 앱에서 확인할 수 있습니다. 개인 급여·메모·연차 기록은 공유되지 않습니다.</p></main><script>
 const encoded=new URLSearchParams(location.search).get('data');
 const details=document.getElementById('details');
 try {
@@ -9,7 +9,18 @@ try { p=JSON.parse(encoded); } catch (_) { p=JSON.parse(decodeURIComponent(encod
 if(!p||typeof p!=='object'||Array.isArray(p)||p.format!=='grid-by-day-share'||![1,2,3].includes(p.version)||!Array.isArray(p.shiftTypes)||p.shiftTypes.length<1||p.shiftTypes.length>100||!p.shiftTypes.every(x=>x&&typeof x.id==='string'&&typeof x.name==='string')||!Array.isArray(p.pattern)||p.pattern.length>366||!['repeat','monthly'].includes(p.mode)||typeof p.patternStartDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(p.patternStartDate)||!Number.isInteger(p.patternStartIndex))throw Error('지원하지 않는 근무표입니다.');
 if(p.mode==='monthly' && !p.days && !p.teams && typeof p.packedDays!=='string')throw Error('월간 근무표 데이터가 없습니다.');
 details.textContent='유형: '+(p.mode==='monthly'?'매월 편성형':'고정 반복형')+'\n근무 종류: '+p.shiftTypes.map(x=>String(x.name||'').slice(0,40)).join(', ')+'\n기준일: '+String(p.patternStartDate||'')+(p.month?'\n대상 월: '+String(p.month):'');
-const open=document.getElementById('open');open.href='mobile://share?data='+encodeURIComponent(encoded);open.hidden=false;
+const open=document.getElementById('open');open.hidden=false;
+open.addEventListener('click',async()=>{
+ const status=document.getElementById('transfer-status');
+ try {
+  if(!navigator.clipboard?.writeText)throw Error('이 브라우저에서는 자동 복사를 지원하지 않습니다.');
+  await navigator.clipboard.writeText(JSON.stringify(p));
+  status.textContent='근무표 데이터를 복사했습니다. 앱으로 이동합니다.';
+  location.href='mobile:///share?clipboard=1';
+ }catch(error){
+  status.textContent='자동 복사에 실패했습니다. 브라우저의 클립보드 권한을 허용한 후 다시 눌러 주세요. ('+(error?.message||'')+')';
+ }
+});
 }catch(e){
 const reason=e instanceof Error?e.message:'알 수 없는 오류';
 const looksCut=/Unterminated string|Unexpected end|Unexpected end of JSON input/i.test(reason);
