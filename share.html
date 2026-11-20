@@ -39,7 +39,7 @@ if(encoded.startsWith('v4.')){
    const days={};
    const origin=Date.UTC(2020,0,1);
    for(const item of a[7].split(',')){
-     if(!/^[0-9a-z]+\\.[0-9a-z]+$/.test(item))throw Error('잘못된 근무 날짜입니다.');
+     if(!/^[0-9a-z]+\.[0-9a-z]+$/.test(item))throw Error('잘못된 근무 날짜입니다.');
      const [d,s]=item.split('.');
      const index=parseInt(s,36), offset=parseInt(d,36);
      if(!Number.isSafeInteger(offset)||offset<0||offset>30000||!shiftTypes[index])throw Error('잘못된 근무 날짜 또는 종류입니다.');
