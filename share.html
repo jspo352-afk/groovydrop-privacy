@@ -28,7 +28,32 @@ try {
 if(!encoded||encoded.length>30000)throw Error('유효한 공유 데이터가 없습니다.');
 // URLSearchParams already decodes the query value. Keep a legacy fallback for older links.
 let p;
-if(encoded.startsWith('v5.')){
+if(encoded.startsWith('v6.')){
+ const raw=encoded.slice(3);
+ if(!/^[A-Za-z0-9_-]+$/.test(raw)||raw.length>30000)throw Error('Invalid v6 link');
+ const base64=raw.replace(/-/g,'+').replace(/_/g,'/');
+ const bytes=Uint8Array.from(atob(base64),ch=>ch.charCodeAt(0));
+ const a=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+ if(!Array.isArray(a)||a.length!==8||a[0]!==6||!['m','r'].includes(a[1])||!Array.isArray(a[6]))throw Error('Unsupported v6 link');
+ const names=["주간","야간","비번","이브닝","당직","미지정","Day","Night","Off","Evening","Duty","Unassigned","日勤","夜勤","休み","夕勤","当直","未指定","Día","Noche","Libre","Tarde","Guardia","Sin asignar","Diurno","Noturno","Folga","Plantão","Não atribuído","Siang","Malam","Libur","Sore","Piket","Belum ditentukan","दिन","रात","छुट्टी","शाम","ड्यूटी","निर्धारित नहीं","白班","夜班","休息","晚班","值班","日班","Tagschicht","Nachtschicht","Frei","Spätschicht","Bereitschaft","Nicht zugewiesen"];
+ const shiftTypes=a[6].map(x=>{
+  if(!Array.isArray(x)||x.length!==4||typeof x[0]!=='string'||!(typeof x[1]==='string'||Number.isInteger(x[1]))||typeof x[2]!=='string'||!/^[0-9a-fA-F]{18}$/.test(x[2])||typeof x[3]!=='string'||!(x[3]===''||/^(?:[01]\d|2[0-3])[0-5]\d(?:[01]\d|2[0-3])[0-5]\d$/.test(x[3])))throw Error('Invalid shift');
+  const name=typeof x[1]==='number'?names[x[1]]:x[1];if(typeof name!=='string')throw Error('Invalid shift name');
+  return{id:x[0],name,background:'#'+x[2].slice(0,6),foreground:'#'+x[2].slice(6,12),swatch:'#'+x[2].slice(12,18),startTime:x[3]?x[3].slice(0,2)+':'+x[3].slice(2,4):'',endTime:x[3]?x[3].slice(4,6)+':'+x[3].slice(6,8):''};
+ });
+ p={format:'grid-by-day-share',version:3,mode:a[1]==='m'?'monthly':'repeat',patternId:a[2],pattern:a[3],patternStartDate:a[4],patternStartIndex:a[5],shiftTypes};
+ if(p.mode==='monthly'){
+  const v=a[7];
+  if(!Array.isArray(v)||v.length!==3||typeof v[0]!=='string'||!/^[0-9a-z]+$/.test(v[0])||!Number.isInteger(v[1])||v[1]<1||v[1]>1500||typeof v[2]!=='string'||!/^[A-Za-z0-9_-]+$/.test(v[2]))throw Error('Invalid schedule');
+  const start=parseInt(v[0],36),count=v[1],packed=v[2];
+  if(!Number.isSafeInteger(start)||start<0||start+count>30000||packed.length!==Math.ceil(Math.ceil(count*3/8)*8/6))throw Error('Invalid schedule length');
+  const binary=atob(packed.replace(/-/g,'+').replace(/_/g,'/'));
+  if(binary.length!==Math.ceil(count*3/8))throw Error('Invalid schedule bytes');
+  const days={};let buffer=0,bits=0,offset=0;
+  for(const ch of binary){buffer=(buffer<<8)|ch.charCodeAt(0);bits+=8;while(bits>=3&&offset<count){bits-=3;const index=(buffer>>>bits)&7;if(index!==7){if(!shiftTypes[index])throw Error('Invalid shift index');days[new Date(Date.UTC(2020,0,1)+(start+offset)*86400000).toISOString().slice(0,10)]=shiftTypes[index].id;}offset++;}}
+  p.days=days;
+ }
+}else if(encoded.startsWith('v5.')){
  const raw=encoded.slice(3);
  if(!/^[A-Za-z0-9_-]+$/.test(raw)||raw.length>30000)throw Error('Invalid v5 link');
  const base64=raw.replace(/-/g,'+').replace(/_/g,'/');
