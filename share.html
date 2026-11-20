@@ -3,8 +3,11 @@ const encoded=new URLSearchParams(location.search).get('data');
 const details=document.getElementById('details');
 try {
 if(!encoded||encoded.length>30000)throw Error('유효한 공유 데이터가 없습니다.');
-const p=JSON.parse(decodeURIComponent(encoded));
-if(p.format!=='grid-by-day-share'||p.version!==1||!Array.isArray(p.shiftTypes)||!Array.isArray(p.pattern)||p.shiftTypes.length>100||!['repeat','monthly'].includes(p.mode))throw Error('지원하지 않는 근무표입니다.');
+// URLSearchParams already decodes the query value. Keep a legacy fallback for older links.
+let p;
+try { p=JSON.parse(encoded); } catch (_) { p=JSON.parse(decodeURIComponent(encoded)); }
+if(!p||typeof p!=='object'||Array.isArray(p)||p.format!=='grid-by-day-share'||![1,2,3].includes(p.version)||!Array.isArray(p.shiftTypes)||p.shiftTypes.length<1||p.shiftTypes.length>100||!p.shiftTypes.every(x=>x&&typeof x.id==='string'&&typeof x.name==='string')||!Array.isArray(p.pattern)||p.pattern.length>366||!['repeat','monthly'].includes(p.mode)||typeof p.patternStartDate!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(p.patternStartDate)||!Number.isInteger(p.patternStartIndex))throw Error('지원하지 않는 근무표입니다.');
+if(p.mode==='monthly' && !p.days && !p.teams && typeof p.packedDays!=='string')throw Error('월간 근무표 데이터가 없습니다.');
 details.textContent='유형: '+(p.mode==='monthly'?'매월 편성형':'고정 반복형')+'\n근무 종류: '+p.shiftTypes.map(x=>String(x.name||'').slice(0,40)).join(', ')+'\n기준일: '+String(p.patternStartDate||'')+(p.month?'\n대상 월: '+String(p.month):'');
 const qrUrl=location.href;const qrNode=document.getElementById('qr');window.addEventListener('load',()=>{if(typeof QRCode!=='undefined' && qrUrl.length<2300){new QRCode(qrNode,{text:qrUrl,width:200,height:200,correctLevel:QRCode.CorrectLevel.L});document.getElementById('qr-help').textContent='동료가 이 QR코드를 스캔하면 근무표를 확인할 수 있습니다.';}});const open=document.getElementById('open');open.href='mobile://share?data='+encodeURIComponent(encoded);open.hidden=false;
 }catch(e){details.textContent='공유 링크를 확인할 수 없습니다. 보낸 사람에게 새 링크를 요청해 주세요.'}
